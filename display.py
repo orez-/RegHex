@@ -2,6 +2,7 @@ import itertools
 import os.path
 import random
 
+import get_key
 
 SIZE = 4
 
@@ -18,8 +19,9 @@ def get_words():
             yield group
 
 
-def print_board(board):
+def print_board(board, hilite):
     size = SIZE - 1
+    hx, hy = hilite
 
     max_width = max(
         len(word) - abs(y)
@@ -37,9 +39,13 @@ def print_board(board):
     # Main hex part
     for y, word in enumerate(board.clues[0], -size):
         print('{:>{}}'.format(word, max_width + abs(y)), end=' ─ ')
-        width = size * 2 - abs(y)
-        for x in range(width + 1):
-            print(end='. ')
+        start = -min(y, 0) - size
+        end = size - max(y, 0)
+        for x in range(start, end + 1):
+            if x == hx and y == hy:
+                print(end='! ')
+            else:
+                print(end='. ')
         if y < 0:
             print('/', next(top, ''))
         elif y > 0:
@@ -61,5 +67,21 @@ class HexBoard:
 
 if __name__ == '__main__':
     board = HexBoard(get_words())
-    print_board(board)
-
+    ch = None
+    x = 0
+    y = 0
+    while ch != '\x03':
+        print_board(board, (x, y))
+        ch = get_key.getch()
+        if ch == get_key.LEFT_ARROW:
+            x -= 1
+        elif ch == get_key.RIGHT_ARROW:
+            x += 1
+        elif ch == get_key.UP_ARROW:
+            if y % 2:
+                x += 1
+            y -= 1
+        elif ch == get_key.DOWN_ARROW:
+            if not (y % 2):
+                x -= 1
+            y += 1
