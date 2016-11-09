@@ -1,3 +1,4 @@
+import enum
 import itertools
 import os.path
 import random
@@ -6,13 +7,19 @@ import string
 import get_key
 
 
+sep = "■"
+af = '\x1b[38;5;{}m'
+ab = '\x1b[48;5;{}m'
+clear = '\x1b[0m'
+
+
 def get_words(size):
     with open(os.path.expanduser('~/Desktop/python_sundry/dictionary.txt')) as f:
         groups = itertools.groupby(f, lambda x: x[0].lower())
         for _ in range(3):
             letter, word_group = next(groups)
             group = sorted(
-                word.strip()
+                word.strip().upper()
                 for word in random.sample(list(word_group), size * 2 - 1)
             )
             yield group
@@ -22,9 +29,19 @@ def start_of_row(y, size):
     return -min(y, 0) - size
 
 
+def get_color(status, bg=False):
+    color = ab if bg else af
+    if status == RowStatus.valid:
+        return ab.format(7) + af.format(0) if bg else ''
+    if status == RowStatus.invalid:
+        return color.format(161)
+    if status == RowStatus.finished:
+        return color.format(244)
+
+
 def print_board(board, hilite):
     size = SIZE - 1
-    hx, hy = hilite
+    hx, hy, hz = coordinate(*hilite)
 
     max_width = max(
         len(clue.clue) - abs(y)
@@ -35,29 +52,38 @@ def print_board(board, hilite):
     bottom = iter([''] + board.clues[2][::-1])
 
     # Top
-    for y, word in zip(range(SIZE + 1), top):
+    for y, clue in zip(range(SIZE + 1), top):
+        color = get_color(clue.status, -y + size == hz) if clue else ''
         # 3 is the length of the space between the left words and the hex.
-        print(' ' * (max_width + 3 + SIZE * 2 - y) + '/ ' * y + str(word))
+        print(' ' * (max_width + 3 + SIZE * 2 - y), '/ ' * y, color, str(clue), clear, sep='')
 
     # Main hex part
-    for y, word in enumerate(board.clues[0], -size):
-        print('{:>{}}'.format(str(word), max_width + abs(y)), end=' ─ ')
+    for y, clue in enumerate(board.clues[0], -size):
+        color = get_color(clue.status, hy == y) if clue else ''
+        print(' ' * (max_width + abs(y) - len(str(clue))), color, str(clue), clear, sep='', end=' - ')
         start = start_of_row(y, size)
-        for x, letter in enumerate(word.text, start):
-            if x == hx and y == hy:
-                print(end='! ')
-            else:
-                print(letter or '.', end=' ')
+        end = size - max(y, 0)
+        for x, letter in enumerate(clue.text, start):
+            color = get_color(RowStatus.valid, x == hx and y == hy)
+            print(color, letter or '.', clear, sep='', end=' ')
         if y < 0:
-            print('/', next(top, ''))
+            clue = next(top, '')
+            # two lines above the end of the row
+            color = get_color(clue.status, -end - y - 2 == hz) if clue else ''
+            print('/ ', color, clue, clear, sep='')
         elif y > 0:
-            print('\\', next(bottom))
+            clue = next(bottom)
+            # two lines below the end of the row
+            color = get_color(clue.status, end + 2 == hx) if clue else ''
+            print('\\ ', color, clue, clear, sep='')
         else:
             print()
 
-    for y, word in enumerate(bottom, -SIZE):
+    for y, clue in enumerate(bottom, -SIZE):
+        color = get_color(clue.status, -y - size == hx) if clue else ''
         # 3 is the length of the space between the left words and the hex.
-        print(' ' * (max_width + 3 + SIZE * 2 + y) + '\\ ' * abs(y) + str(word))
+        print(' ' * (max_width + 3 + SIZE * 2 + y), '\\ ' * abs(y), color, str(clue), clear, sep='')
+    print()
 
 
 def coordinate(x, y, z=None):
@@ -73,15 +99,35 @@ def coordinate(x, y, z=None):
     return coords
 
 
+class RowStatus(enum.Enum):
+    valid = 1
+    invalid = 2
+    finished = 3
+
+
 class ClueRow:
     def __init__(self, clue, length):
         self.clue = clue
         self.text = [None] * length
+        self.status = RowStatus.valid
+
+    @property
+    def as_text(self):
+        return ''.join(letter or ' ' for letter in self.text)
+
+    def validate(self):
+        match = self.clue[0] not in self.text  # TODO: this is just for testing.
+        done = None not in self.text
+        if not match:
+            self.status = RowStatus.invalid
+        elif done:
+            self.status = RowStatus.finished
+        else:
+            self.status = RowStatus.valid
 
     def set_char(self, pos, char):
-        print(len(self.text))
         self.text[pos] = char
-        # TODO: revalidation
+        self.validate()
 
     def __str__(self):
         return self.clue
@@ -137,6 +183,8 @@ if __name__ == '__main__':
                 y += 1
         elif ch in string.ascii_letters:
             board.set_char((x, y), ch.upper())
+        elif ch == ' ':
+            board.set_char((x, y), None)
         elif ch == '[':
             board.clues = board.clues[1:] + [board.clues[0]]
         elif ch == ']':
