@@ -48,7 +48,7 @@ def print_board(board, hilite):
         for y, clue in enumerate(board.clues[0], -size)
     )
 
-    top = iter(board.clues[1][::-1])
+    top = iter(board.clues[1][::-1] + [''])
     bottom = iter([''] + board.clues[2][::-1])
 
     # Top
@@ -67,7 +67,7 @@ def print_board(board, hilite):
             color = get_color(RowStatus.valid, x == hx and y == hy)
             print(color, letter or '.', clear, sep='', end=' ')
         if y < 0:
-            clue = next(top, '')
+            clue = next(top)
             # two lines above the end of the row
             color = get_color(clue.status, -end - y - 2 == hz) if clue else ''
             print('/ ', color, clue, clear, sep='')
