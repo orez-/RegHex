@@ -59,15 +59,22 @@ class Sequence(RegEx):
 
 
 class Repetition(RegEx):
-    def __init__(self, internal):
+    def __init__(self, internal, at_least_one):
         self._internal = internal
+        self._at_least_one = at_least_one
 
-    def match(self, string, index):
-        yield from self._internal.match(string, index)
-        yield index
+    def match(self, string, index, *, at_least_one=None):
+        for i in self._internal.match(string, index):
+            yield from self.match(string, i, at_least_one=False)
+
+        if not (self._at_least_one if at_least_one is None else at_least_one):
+            yield index
 
     def __repr__(self):
-        return "Repetition( {!r} )".format(self._internal)
+        return "Repetition{}( {!r} )".format(
+            '+' if self._at_least_one else '*',
+            self._internal,
+        )
 
 
 class Symbol(RegEx):
@@ -100,8 +107,11 @@ class Bracket(RegEx):
 
     def match(self, string, index):
         # shut up
-        if string[index] == ' ' or re.match(r"[{}]".format(self._chars), string[index]):
-            yield index + 1
+        try:
+            if string[index] == ' ' or re.match(r"[{}]".format(self._chars), string[index]):
+                yield index + 1
+        except IndexError:
+            ...
 
 
 # ---
@@ -163,7 +173,12 @@ class RegExParser:
 
         while self._more() and self._peek() == '*':
             self._eat('*')
-            base = Repetition(base)
+            base = Repetition(base, False)
+
+        while self._more() and self._peek() == '+':
+            self._eat('+')
+            base = Repetition(base, True)
+
         return base
 
     def _bracket(self):
@@ -251,6 +266,8 @@ match(r"abc", "a  ")
 match(r"abc", " b ")
 match(r"abc", "  c")
 match(r"abc", " e ", False)
+match(r"abcd", "abc", False)
+match(r"(abc)", "abc")
 
 match(r"a.c", "ab ")
 match(r"a.c", "a c")
@@ -286,6 +303,4 @@ match(r"([ab])\1*", "bbbbb")
 match(r"([ab])\1*", "babab", False)
 match(r"([ab])\1*", "b b b")
 match(r"([ab])\1*", "b a b", False)
-match(r"([ab])\1*", "b a b")
-
-match(r"([ab])\1*", "b a b")
+match(r"([ab])\1*", " a b ", False)
