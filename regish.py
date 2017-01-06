@@ -1,3 +1,5 @@
+import collections
+import contextlib
 import itertools
 import re
 import traceback
@@ -9,7 +11,7 @@ class RegEx(object):
 
 class Empty(RegEx):
     def match(self, string, index):
-        yield index
+        yield index, ''
 
     def __repr__(self):
         return "Empty()"
@@ -22,7 +24,7 @@ class Statement(RegEx):
         self._regex = regex
 
     def match(self, string):
-        for m in self._regex.match(string, 0):
+        for m, word in self._regex.match(string, 0):
             if m == len(string):
                 return True
         return False
@@ -50,9 +52,9 @@ class Sequence(RegEx):
         self.right = right
 
     def match(self, string, index):
-        for i in self.left.match(string, index):
-            for j in self.right.match(string, i):
-                yield j
+        for i, one in self.left.match(string, index):
+            for j, two in self.right.match(string, i):
+                yield j, one + two
 
     def __repr__(self):
         return "Sequence( {!r}, {!r} )".format(self.left, self.right)
@@ -64,11 +66,13 @@ class Repetition(RegEx):
         self._at_least_one = at_least_one
 
     def match(self, string, index, *, at_least_one=None):
-        for i in self._internal.match(string, index):
-            yield from self.match(string, i, at_least_one=False)
+        for i, start in self._internal.match(string, index):
+            if i != index:  # TODO: i believe this breaks matching `()+`.
+                for j, more in self.match(string, i, at_least_one=False):
+                    yield j, start + more
 
         if not (self._at_least_one if at_least_one is None else at_least_one):
-            yield index
+            yield index, ''
 
     def __repr__(self):
         return "Repetition{}( {!r} )".format(
@@ -95,7 +99,7 @@ class Symbol(RegEx):
                 continue
             if char not in {' ', expected}:
                 return
-        yield index + len(self._symbol)
+        yield index + len(self._symbol), string[index:index + len(self._symbol)]
 
 
 class Bracket(RegEx):
@@ -109,16 +113,67 @@ class Bracket(RegEx):
         # shut up
         try:
             if string[index] == ' ' or re.match(r"[{}]".format(self._chars), string[index]):
-                yield index + 1
+                yield index + 1, string[index]
         except IndexError:
             ...
 
+
+class Backref(RegEx):
+    def __init__(self, capture):
+        self._capture = capture
+
+    def __repr__(self):
+        return "Backref()"
+
+    def match(self, string, index):
+        yield from self._capture.match(string, index)
+
+
+class Capture(RegEx):
+    def __init__(self, regex):
+        self._regex = regex
+        self._shapes = collections.deque()
+
+    def __repr__(self):
+        return "Capture( {!r} )".format(self._regex)
+
+    def match(self, string, index):
+        for i, word in self._regex.match(string, index):
+            with self.push(word) as did_push:
+                if did_push:
+                    yield i, word
+
+    @contextlib.contextmanager
+    def push(self, value):
+        if not self._shapes:
+            self._shapes.append(value)
+        else:
+            shape = self._shapes[-1]
+            if len(shape) != len(value):
+                yield False
+                return
+
+            new_word = collections.deque()
+            for v, s in zip(value, shape):
+                if v == s or s == ' ':
+                    new_word.append(v)
+                elif v == ' ':
+                    new_word.append(s)
+                else:
+                    yield False
+                    return
+            self._shapes.append(''.join(new_word))
+
+        yield True
+
+        self._shapes.pop()
 
 # ---
 
 class RegExParser:
     def __init__(self, input_):
         self._input = input_
+        self._captures = []
 
     def parse(self):
         self._ptr = 0
@@ -193,7 +248,9 @@ class RegExParser:
             self._eat('(')
             r = self._regex()
             self._eat(')')
-            return r
+            capture = Capture(r)
+            self._captures.append(capture)
+            return capture
         if peek == '[':
             self._eat('[')
             r = self._bracket()
@@ -201,7 +258,10 @@ class RegExParser:
             return r
         if peek == '\\':
             self._eat('\\')
-            return Symbol(self._next())
+            num = int(self._next())
+            if num > len(self._captures) or num < 1:
+                raise ParseError("invalid group reference {}".format(num))
+            return Backref(self._captures[num - 1])
         return Symbol(self._next())
 
 
@@ -291,6 +351,8 @@ match(r"a*c", "a  ")
 match(r"a*c", " ac")
 match(r"a*c", "  c")
 match(r"a*c", "   ")
+match(r"()*abc", "   ")
+match(r"()+abc", "   ")
 
 match(r"[nuts]*", "   ")
 match(r"[nuts]*", "stu")
@@ -304,3 +366,9 @@ match(r"([ab])\1*", "babab", False)
 match(r"([ab])\1*", "b b b")
 match(r"([ab])\1*", "b a b", False)
 match(r"([ab])\1*", " a b ", False)
+match(r"([ab])\1*", "  c  ", False)
+match(r"([ab]+)q\1", "   qab", False)
+match(r"([ab]+)q\1", " b qa a")
+match(r"([ab]+)\1", " ba ")
+match(r"([ab]+)\1", "   ", False)
+match(r"((ab|cd)+)\1", "a  d", False)
