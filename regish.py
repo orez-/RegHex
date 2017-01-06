@@ -177,6 +177,18 @@ class Capture(RegEx):
         yield
         self._shapes.pop()
 
+
+class Optional(RegEx):
+    def __init__(self, regex):
+        self._regex = regex
+
+    def __repr__(self):
+        return "Optional( {!r} )".format(self._regex)
+
+    def match(self, string, index):
+        yield from self._regex.match(string, index)
+        yield index, ''
+
 # ---
 
 class RegExParser:
@@ -242,6 +254,10 @@ class RegExParser:
         while self._more() and self._peek() == '+':
             self._eat('+')
             base = Repetition(base, True)
+
+        while self._more() and self._peek() == '?':
+            self._eat('?')
+            base = Optional(base)
 
         return base
 
@@ -328,57 +344,66 @@ def match(regex, string, expected=True):
         print(clear)
 
 
-match(r"abc", "abc")
-match(r"abc", "def", False)
-match(r"abc", "   ")
-match(r"abc", "a  ")
-match(r"abc", " b ")
-match(r"abc", "  c")
-match(r"abc", " e ", False)
-match(r"abcd", "abc", False)
-match(r"(abc)", "abc")
+def run_tests():
+    match(r"abc", "abc")
+    match(r"abc", "def", False)
+    match(r"abc", "   ")
+    match(r"abc", "a  ")
+    match(r"abc", " b ")
+    match(r"abc", "  c")
+    match(r"abc", " e ", False)
+    match(r"abcd", "abc", False)
+    match(r"(abc)", "abc")
 
-match(r"a.c", "ab ")
-match(r"a.c", "a c")
+    match(r"a.c", "ab ")
+    match(r"a.c", "a c")
 
-match(r"abc|def", "abc")
-match(r"abc|def", "def")
-match(r"abc|def", "  c")
-match(r"abc|def", "d  ")
-match(r"abc|def", "abf", False)
-match(r"abc|def", "a f", False)
+    match(r"abc|def", "abc")
+    match(r"abc|def", "def")
+    match(r"abc|def", "  c")
+    match(r"abc|def", "d  ")
+    match(r"abc|def", "abf", False)
+    match(r"abc|def", "a f", False)
 
-match(r"a[nuts]c", "a c")
-match(r"a[nuts]c", "at ")
+    match(r"a[nuts]c", "a c")
+    match(r"a[nuts]c", "at ")
 
-match(r"a[n-s]c", "a c")
-match(r"a[n-s]c", " pc")
+    match(r"a[n-s]c", "a c")
+    match(r"a[n-s]c", " pc")
 
-match(r"a*c", "aac")
-match(r"a*c", "a c")
-match(r"a*c", "a  ")
-match(r"a*c", " ac")
-match(r"a*c", "  c")
-match(r"a*c", "   ")
-match(r"()*abc", "   ")
-match(r"()+abc", "   ")
+    match(r"a*c", "aac")
+    match(r"a*c", "a c")
+    match(r"a*c", "a  ")
+    match(r"a*c", " ac")
+    match(r"a*c", "  c")
+    match(r"a*c", "   ")
+    match(r"()*abc", "   ")
+    match(r"()+abc", "   ")
 
-match(r"[nuts]*", "   ")
-match(r"[nuts]*", "stu")
-match(r"[nuts]+", "tun")
-match(r"[abc]*[nuts]+yz", "tyz")
-match(r"[abc]*[nuts]+yz", "ayz", False)
+    match(r"[nuts]*", "   ")
+    match(r"[nuts]*", "stu")
+    match(r"[nuts]+", "tun")
+    match(r"[abc]*[nuts]+yz", "tyz")
+    match(r"[abc]*[nuts]+yz", "ayz", False)
 
-match(r"([ab])\1*", "aaaaa")
-match(r"([ab])\1*", "bbbbb")
-match(r"([ab])\1*", "babab", False)
-match(r"([ab])\1*", "b b b")
-match(r"([ab])\1*", "b a b", False)
-match(r"([ab])\1*", " a b ", False)
-match(r"([ab])\1*", "  c  ", False)
-match(r"([ab]+)q\1", "   qab", False)
-match(r"([ab]+)q\1", " b qa a")
-match(r"([ab]+)\1", " ba ")
-match(r"([ab]+)\1", "   ", False)
-match(r"(ab|cd)\1", "a  d", False)
-match(r"(ab|cd)\1+", "a  d  ", False)
+    match(r"([ab])\1*", "aaaaa")
+    match(r"([ab])\1*", "bbbbb")
+    match(r"([ab])\1*", "babab", False)
+    match(r"([ab])\1*", "b b b")
+    match(r"([ab])\1*", "b a b", False)
+    match(r"([ab])\1*", " a b ", False)
+    match(r"([ab])\1*", "  c  ", False)
+    match(r"([ab]+)q\1", "   qab", False)
+    match(r"([ab]+)q\1", " b qa a")
+    match(r"([ab]+)\1", " ba ")
+    match(r"([ab]+)\1", "   ", False)
+    match(r"(ab|cd)\1", "a  d", False)
+    match(r"(ab|cd)\1+", "a  d  ", False)
+
+    match(r"a?b?", "a")
+    match(r"a?b?", "b")
+    match(r"a?b?", "c", False)
+    match(r"a?", " ")
+
+if __name__ == '__main__':
+    run_tests()
