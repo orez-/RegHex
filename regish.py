@@ -65,13 +65,16 @@ class Repetition(RegEx):
         self._internal = internal
         self._at_least_one = at_least_one
 
-    def match(self, string, index, *, at_least_one=None):
+    def match(self, string, index, *, skip_num_check=False):
+        zero_width = False
         for i, start in self._internal.match(string, index):
-            if i != index:  # TODO: i believe this breaks matching `()+`.
-                for j, more in self.match(string, i, at_least_one=False):
+            if i != index:
+                for j, more in self.match(string, i, skip_num_check=True):
                     yield j, start + more
+            else:
+                zero_width = True
 
-        if not (self._at_least_one if at_least_one is None else at_least_one):
+        if skip_num_check or not self._at_least_one or zero_width:
             yield index, ''
 
     def __repr__(self):
@@ -97,7 +100,7 @@ class Symbol(RegEx):
 
             if expected == '.':
                 continue
-            if char not in {' ', expected}:
+            if char not in {ANY_CHR, expected}:
                 return
         yield index + len(self._symbol), string[index:index + len(self._symbol)]
 
@@ -112,7 +115,7 @@ class Bracket(RegEx):
     def match(self, string, index):
         # shut up
         try:
-            if string[index] == ' ' or re.match(r"[{}]".format(self._chars), string[index]):
+            if string[index] == ANY_CHR or re.match(r"[{}]".format(self._chars), string[index]):
                 yield index + 1, string[index]
         except IndexError:
             ...
@@ -137,35 +140,41 @@ class Capture(RegEx):
     def __repr__(self):
         return "Capture( {!r} )".format(self._regex)
 
+    @staticmethod
+    def _combine(str1, str2):
+        # combine two strings, respecting ANY_CHR
+        # if the strings are incompatible, return None
+        if len(str1) != len(str2):
+            return
+
+        new_word = collections.deque()
+        for a, b in zip(str1, str2):
+            if a == b or b == ANY_CHR:
+                new_word.append(a)
+            elif a == ANY_CHR:
+                new_word.append(b)
+            else:
+                return
+        return ''.join(new_word)
+
     def match(self, string, index):
+        offset = 0
+        if self._shapes:
+            shape = self._shapes[-1]
+            value = string[index: index + len(shape)]
+            string = self._combine(shape, value)
+            if string is None:
+                return
+            offset = index
+            index = 0
         for i, word in self._regex.match(string, index):
-            with self.push(word) as did_push:
-                if did_push:
-                    yield i, word
+            with self._push(word):
+                yield i + offset, word
 
     @contextlib.contextmanager
-    def push(self, value):
-        if not self._shapes:
-            self._shapes.append(value)
-        else:
-            shape = self._shapes[-1]
-            if len(shape) != len(value):
-                yield False
-                return
-
-            new_word = collections.deque()
-            for v, s in zip(value, shape):
-                if v == s or s == ' ':
-                    new_word.append(v)
-                elif v == ' ':
-                    new_word.append(s)
-                else:
-                    yield False
-                    return
-            self._shapes.append(''.join(new_word))
-
-        yield True
-
+    def _push(self, value):
+        self._shapes.append(value)
+        yield
         self._shapes.pop()
 
 # ---
@@ -371,4 +380,5 @@ match(r"([ab]+)q\1", "   qab", False)
 match(r"([ab]+)q\1", " b qa a")
 match(r"([ab]+)\1", " ba ")
 match(r"([ab]+)\1", "   ", False)
-match(r"((ab|cd)+)\1", "a  d", False)
+match(r"(ab|cd)\1", "a  d", False)
+match(r"(ab|cd)\1+", "a  d  ", False)
