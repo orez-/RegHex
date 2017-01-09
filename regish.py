@@ -385,6 +385,10 @@ def run_tests():
     match(r"[nuts]+", "tun")
     match(r"[abc]*[nuts]+yz", "tyz")
     match(r"[abc]*[nuts]+yz", "ayz", False)
+    match(r"[^nuts]*", "abc")
+    match(r"([^mc]|mm|cc)*", "  f")
+    match(r"([^mc]|mm|cc)*", " fm", False)
+    match(r"([^mc]|mm)*", "xyz")
 
     match(r"([ab])\1*", "aaaaa")
     match(r"([ab])\1*", "bbbbb")
