@@ -5,6 +5,7 @@ import random
 import string
 
 import get_key
+import regish
 
 
 sep = "■"
@@ -13,7 +14,7 @@ ab = '\x1b[48;5;{}m'
 clear = '\x1b[0m'
 
 
-def get_words(size):
+def get_random_words(size):
     with open(os.path.expanduser('~/Desktop/python_sundry/dictionary.txt')) as f:
         groups = itertools.groupby(f, lambda x: x[0].lower())
         for _ in range(3):
@@ -23,6 +24,56 @@ def get_words(size):
                 for word in random.sample(list(word_group), size * 2 - 1)
             )
             yield group
+
+
+def get_original_clues():
+    return [
+        [
+            r'.*H.*H.*',
+            r'(DI|NS|TH|OM)*',
+            r'F.*[AO].*[AO].*',
+            r'(O|RHH|MM)*',
+            r'.*',
+            r'C*MC(CCC|MM)*',
+            r'[^C]*[^R]*III.*',
+            r'(...?)\1*',
+            r'([^X]|XCC)*',
+            r'(RR|HHH)*.?',
+            r'N.*X.X.X.*E',
+            r'R*D*M*',
+            r'.(C|HH)*',
+        ],
+        [
+            r'.*SE.*UE.*',
+            r'.*LR.*RL.*',
+            r'.*OXR.*',
+            r'([^EMC]|EM)*',
+            r'(HHX|[^HX])*',
+            r'.*PRR.*DDC.*',
+            r'.*',
+            r'[AM]*CM(RC)*R?',
+            r'([^MC]|MM|CC)*',
+            r'(E|CR|MN)*',
+            r'P+(..)\1.*',
+            r'[CHMNOR]*I[CHMNOR]*',
+            r'(ND|ET|IN)[^X]*',
+        ],
+        [
+            r'.*G.*V.*H.*',
+            r'[CR]*',
+            r'.*XEXM*',
+            r'.*DD.*CCM.*',
+            r'.*XHCR.*X.*',
+            r'.*(.)(.)(.)(.)\4\3\2\1.*',
+            r'.*(IN|SE|HI)',
+            r'[^C]*MMM[^C]*',
+            r'.*(.)C\1X\1.*',
+            r'[CEIMU]*OH[AEMOR]*',
+            r'(RX|[^R])*',
+            r'[^M]*M[^M]*',
+            r'(S|MM|HHH)*',
+        ],
+    ]
 
 
 def start_of_row(y, size):
@@ -108,15 +159,20 @@ class RowStatus(enum.Enum):
 class ClueRow:
     def __init__(self, clue, length):
         self.clue = clue
+        self.re_clue = regish.compile_re(clue)
         self.text = [None] * length
         self.status = RowStatus.valid
+
+        self.validate()
 
     @property
     def as_text(self):
         return ''.join(letter or ' ' for letter in self.text)
 
     def validate(self):
-        match = self.clue[0] not in self.text  # TODO: this is just for testing.
+        # match = self.clue[0] not in self.text  # TODO: this is just for testing.
+        match = self.re_clue.match(self.as_text)
+
         done = None not in self.text
         if not match:
             self.status = RowStatus.invalid
@@ -156,13 +212,20 @@ class HexBoard:
 
 
 if __name__ == '__main__':
-    SIZE = 4
-    board = HexBoard(get_words(SIZE), SIZE)
+    if False:
+        SIZE = 4
+        words = get_random_words(SIZE)
+    else:
+        SIZE = 7
+        words = get_original_clues()
+
+    board = HexBoard(words, SIZE)
 
     x = 0
     y = 0
     ch = None
     while ch != '\x03':
+        print("\033c")
         print_board(board, (x, y))
         ch = get_key.getch()
         if ch == get_key.LEFT_ARROW:
