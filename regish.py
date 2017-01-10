@@ -129,7 +129,7 @@ class Backref(RegEx):
         return "Backref()"
 
     def match(self, string, index):
-        yield from self._capture.match(string, index)
+        yield from self._capture.ref_match(string, index)
 
 
 class Capture(RegEx):
@@ -142,8 +142,10 @@ class Capture(RegEx):
 
     @staticmethod
     def _combine(str1, str2):
-        # combine two strings, respecting ANY_CHR
-        # if the strings are incompatible, return None
+        """
+        Combine two strings, respecting ANY_CHR.
+        If the strings are incompatible, return None
+        """
         if len(str1) != len(str2):
             return
 
@@ -158,18 +160,21 @@ class Capture(RegEx):
         return ''.join(new_word)
 
     def match(self, string, index):
-        offset = 0
-        if self._shapes:
-            shape = self._shapes[-1]
-            value = string[index: index + len(shape)]
-            string = self._combine(shape, value)
-            if string is None:
-                return
-            offset = index
-            index = 0
+        yield from self._match(string, index)
+
+    def _match(self, string, index, offset=0):
         for i, word in self._regex.match(string, index):
             with self._push(word):
                 yield i + offset, word
+
+    def ref_match(self, string, index):
+        shape = self._shapes[-1]
+        value = string[index: index + len(shape)]
+        string = self._combine(shape, value)
+        if string is None:
+            return
+        yield from self._match(string, 0, index)
+
 
     @contextlib.contextmanager
     def _push(self, value):
@@ -331,7 +336,6 @@ def match(regex, string, expected=True):
     msg = "{{}}{!r} {}~ {!r}: {{}}!".format(regex, "=" if expected else "≠", string).format
     try:
         re = compile_re(regex)
-        print(re)
         if re.match(string) == expected:
             print(msg(af(2), "Success"), end='')
             print(clear)
