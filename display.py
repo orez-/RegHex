@@ -8,7 +8,6 @@ import get_key
 import regish
 
 
-sep = "■"
 af = '\x1b[38;5;{}m'
 ab = '\x1b[48;5;{}m'
 clear = '\x1b[0m'
@@ -19,6 +18,7 @@ def get_random_words(size):
         groups = itertools.groupby(f, lambda x: x[0].lower())
         for _ in range(3):
             letter, word_group = next(groups)
+            del letter
             group = sorted(
                 word.strip().upper()
                 for word in random.sample(list(word_group), size * 2 - 1)
@@ -91,6 +91,7 @@ def get_color(status, bg=False):
 
 
 def print_board(board, hilite):
+    SIZE = board.size
     size = SIZE - 1
     hx, hy, hz = coordinate(*hilite)
 
@@ -111,7 +112,11 @@ def print_board(board, hilite):
     # Main hex part
     for y, clue in enumerate(board.clues[0], -size):
         color = get_color(clue.status, hy == y) if clue else ''
-        print(' ' * (max_width + abs(y) - len(str(clue))), color, str(clue), clear, sep='', end=' - ')
+        print(
+            ' ' * (max_width + abs(y) - len(str(clue))), color, str(clue), clear,
+            sep='',
+            end=' - ',
+        )
         start = start_of_row(y, size)
         end = size - max(y, 0)
         for x, letter in enumerate(clue.text, start):
@@ -211,7 +216,7 @@ class HexBoard:
             self.clues[i][down].set_char(over, char)
 
 
-if __name__ == '__main__':
+def run_cli():
     if False:
         SIZE = 4
         words = get_random_words(SIZE)
@@ -252,3 +257,7 @@ if __name__ == '__main__':
             board.clues = board.clues[1:] + [board.clues[0]]
         elif ch == ']':
             board.clues = [board.clues[-1]] + board.clues[:-1]
+
+
+if __name__ == '__main__':
+    run_cli()

@@ -1,16 +1,18 @@
 import collections
 import contextlib
-import itertools
 import re
 import traceback
 
 ANY_CHR = " "
 
+
 class RegEx(object):
     pass
 
+
 class Empty(RegEx):
     def match(self, string, index):
+        del string
         yield index, ''
 
     def __repr__(self):
@@ -25,6 +27,7 @@ class Statement(RegEx):
 
     def match(self, string):
         for m, word in self._regex.match(string, 0):
+            del word
             if m == len(string):
                 return True
         return False
@@ -118,7 +121,7 @@ class Bracket(RegEx):
             if string[index] == ANY_CHR or re.match(r"[{}]".format(self._chars), string[index]):
                 yield index + 1, string[index]
         except IndexError:
-            ...
+            pass
 
 
 class Backref(RegEx):
@@ -175,7 +178,6 @@ class Capture(RegEx):
             return
         yield from self._match(string, 0, index)
 
-
     @contextlib.contextmanager
     def _push(self, value):
         self._shapes.append(value)
@@ -195,6 +197,7 @@ class Optional(RegEx):
         yield index, ''
 
 # ---
+
 
 class RegExParser:
     def __init__(self, input_):
@@ -224,7 +227,6 @@ class RegExParser:
     def _more(self):
         return self._ptr < len(self._input)
 
-
     # Regular expression term types.
 
     def _statement(self):
@@ -237,8 +239,7 @@ class RegExParser:
             self._eat('|')
             regex = self._regex()
             return Choice(term, regex)
-        else:
-            return term
+        return term
 
     def _term(self):
         factor = RegEx.empty
@@ -290,7 +291,7 @@ class RegExParser:
             self._eat('\\')
             num = int(self._next())
             if num > len(self._captures) or num < 1:
-                raise ParseError("invalid group reference {}".format(num))
+                raise Exception("invalid group reference {}".format(num))
             return Backref(self._captures[num - 1])
         return Symbol(self._next())
 
@@ -329,89 +330,89 @@ def compile_re(regex):
 
 
 # ===
-af = '\x1b[38;5;{}m'.format
-clear = '\x1b[0m'
-
-def match(regex, string, expected=True):
-    msg = "{{}}{!r} {}~ {!r}: {{}}!".format(regex, "=" if expected else "≠", string).format
-    try:
-        re = compile_re(regex)
-        if re.match(string) == expected:
-            print(msg(af(2), "Success"), end='')
-            print(clear)
-        else:
-            print(msg(af(3), "Failure"), end='')
-            print(clear)
-    except:
-        print(msg(af(1), "Error"))
-        traceback.print_exc()
-        print(clear)
-
-
-def run_tests():
-    match(r"abc", "abc")
-    match(r"abc", "def", False)
-    match(r"abc", "   ")
-    match(r"abc", "a  ")
-    match(r"abc", " b ")
-    match(r"abc", "  c")
-    match(r"abc", " e ", False)
-    match(r"abcd", "abc", False)
-    match(r"(abc)", "abc")
-
-    match(r"a.c", "ab ")
-    match(r"a.c", "a c")
-
-    match(r"abc|def", "abc")
-    match(r"abc|def", "def")
-    match(r"abc|def", "  c")
-    match(r"abc|def", "d  ")
-    match(r"abc|def", "abf", False)
-    match(r"abc|def", "a f", False)
-
-    match(r"a[nuts]c", "a c")
-    match(r"a[nuts]c", "at ")
-
-    match(r"a[n-s]c", "a c")
-    match(r"a[n-s]c", " pc")
-
-    match(r"a*c", "aac")
-    match(r"a*c", "a c")
-    match(r"a*c", "a  ")
-    match(r"a*c", " ac")
-    match(r"a*c", "  c")
-    match(r"a*c", "   ")
-    match(r"()*abc", "   ")
-    match(r"()+abc", "   ")
-
-    match(r"[nuts]*", "   ")
-    match(r"[nuts]*", "stu")
-    match(r"[nuts]+", "tun")
-    match(r"[abc]*[nuts]+yz", "tyz")
-    match(r"[abc]*[nuts]+yz", "ayz", False)
-    match(r"[^nuts]*", "abc")
-    match(r"([^mc]|mm|cc)*", "  f")
-    match(r"([^mc]|mm|cc)*", " fm", False)
-    match(r"([^mc]|mm)*", "xyz")
-
-    match(r"([ab])\1*", "aaaaa")
-    match(r"([ab])\1*", "bbbbb")
-    match(r"([ab])\1*", "babab", False)
-    match(r"([ab])\1*", "b b b")
-    match(r"([ab])\1*", "b a b", False)
-    match(r"([ab])\1*", " a b ", False)
-    match(r"([ab])\1*", "  c  ", False)
-    match(r"([ab]+)q\1", "   qab", False)
-    match(r"([ab]+)q\1", " b qa a")
-    match(r"([ab]+)\1", " ba ")
-    match(r"([ab]+)\1", "   ", False)
-    match(r"(ab|cd)\1", "a  d", False)
-    match(r"(ab|cd)\1+", "a  d  ", False)
-
-    match(r"a?b?", "a")
-    match(r"a?b?", "b")
-    match(r"a?b?", "c", False)
-    match(r"a?", " ")
 
 if __name__ == '__main__':
+    af = '\x1b[38;5;{}m'.format
+    clear = '\x1b[0m'
+
+    def match(regex, string, expected=True):
+        msg = "{{}}{!r} {}~ {!r}: {{}}!".format(regex, "=" if expected else "≠", string).format
+        try:
+            compiled_regex = compile_re(regex)
+            if compiled_regex.match(string) == expected:
+                print(msg(af(2), "Success"), end='')
+                print(clear)
+            else:
+                print(msg(af(3), "Failure"), end='')
+                print(clear)
+        except Exception:
+            print(msg(af(1), "Error"))
+            traceback.print_exc()
+            print(clear)
+
+    def run_tests():
+        match(r"abc", "abc")
+        match(r"abc", "def", False)
+        match(r"abc", "   ")
+        match(r"abc", "a  ")
+        match(r"abc", " b ")
+        match(r"abc", "  c")
+        match(r"abc", " e ", False)
+        match(r"abcd", "abc", False)
+        match(r"(abc)", "abc")
+
+        match(r"a.c", "ab ")
+        match(r"a.c", "a c")
+
+        match(r"abc|def", "abc")
+        match(r"abc|def", "def")
+        match(r"abc|def", "  c")
+        match(r"abc|def", "d  ")
+        match(r"abc|def", "abf", False)
+        match(r"abc|def", "a f", False)
+
+        match(r"a[nuts]c", "a c")
+        match(r"a[nuts]c", "at ")
+
+        match(r"a[n-s]c", "a c")
+        match(r"a[n-s]c", " pc")
+
+        match(r"a*c", "aac")
+        match(r"a*c", "a c")
+        match(r"a*c", "a  ")
+        match(r"a*c", " ac")
+        match(r"a*c", "  c")
+        match(r"a*c", "   ")
+        match(r"()*abc", "   ")
+        match(r"()+abc", "   ")
+
+        match(r"[nuts]*", "   ")
+        match(r"[nuts]*", "stu")
+        match(r"[nuts]+", "tun")
+        match(r"[abc]*[nuts]+yz", "tyz")
+        match(r"[abc]*[nuts]+yz", "ayz", False)
+        match(r"[^nuts]*", "abc")
+        match(r"([^mc]|mm|cc)*", "  f")
+        match(r"([^mc]|mm|cc)*", " fm", False)
+        match(r"([^mc]|mm)*", "xyz")
+
+        match(r"([ab])\1*", "aaaaa")
+        match(r"([ab])\1*", "bbbbb")
+        match(r"([ab])\1*", "babab", False)
+        match(r"([ab])\1*", "b b b")
+        match(r"([ab])\1*", "b a b", False)
+        match(r"([ab])\1*", " a b ", False)
+        match(r"([ab])\1*", "  c  ", False)
+        match(r"([ab]+)q\1", "   qab", False)
+        match(r"([ab]+)q\1", " b qa a")
+        match(r"([ab]+)\1", " ba ")
+        match(r"([ab]+)\1", "   ", False)
+        match(r"(ab|cd)\1", "a  d", False)
+        match(r"(ab|cd)\1+", "a  d  ", False)
+
+        match(r"a?b?", "a")
+        match(r"a?b?", "b")
+        match(r"a?b?", "c", False)
+        match(r"a?", " ")
+
     run_tests()
