@@ -296,35 +296,6 @@ class RegExParser:
         return Symbol(self._next())
 
 
-# class RegEx(object):
-#     def match(self, string):
-#         raise NotImplementedError
-
-
-# class Statement(RegEx):
-#     """
-#     < statement >  ::= ^< regex >$
-#     """
-#     def __init__(self, regex):
-#         self._regex = regex
-
-#     def match(self, string):
-#         return self._regex.match(string)
-
-
-# class Base(RegEx):
-#     """
-#     < term > ::= [a-z]+
-#     """
-#     def __init__(self, string):
-#         self._literal = string
-
-#     def match(self, string):
-#         if len(self._literal) > len(string):
-#             return False
-#         return all(c in [a, ANY_CHR] for a, c in zip(self._literal, string))
-
-
 def compile_re(regex):
     return RegExParser(regex).parse()
 

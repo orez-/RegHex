@@ -1,7 +1,4 @@
 import enum
-import itertools
-import os.path
-import random
 import string
 
 import get_key
@@ -11,19 +8,6 @@ import regish
 af = '\x1b[38;5;{}m'
 ab = '\x1b[48;5;{}m'
 clear = '\x1b[0m'
-
-
-def get_random_words(size):
-    with open(os.path.expanduser('~/Desktop/python_sundry/dictionary.txt')) as f:
-        groups = itertools.groupby(f, lambda x: x[0].lower())
-        for _ in range(3):
-            letter, word_group = next(groups)
-            del letter
-            group = sorted(
-                word.strip().upper()
-                for word in random.sample(list(word_group), size * 2 - 1)
-            )
-            yield group
 
 
 def get_original_clues():
@@ -175,7 +159,6 @@ class ClueRow:
         return ''.join(letter or ' ' for letter in self.text)
 
     def validate(self):
-        # match = self.clue[0] not in self.text  # TODO: this is just for testing.
         match = self.re_clue.match(self.as_text)
 
         done = None not in self.text
@@ -217,12 +200,8 @@ class HexBoard:
 
 
 def run_cli():
-    if False:
-        SIZE = 4
-        words = get_random_words(SIZE)
-    else:
-        SIZE = 7
-        words = get_original_clues()
+    SIZE = 7
+    words = get_original_clues()
 
     board = HexBoard(words, SIZE)
 
@@ -251,7 +230,7 @@ def run_cli():
                 y += 1
         elif ch in string.ascii_letters:
             board.set_char((x, y), ch.upper())
-        elif ch == ' ':
+        elif ch in (' ', '\x7f'):
             board.set_char((x, y), None)
         elif ch == '[':
             board.clues = board.clues[1:] + [board.clues[0]]
